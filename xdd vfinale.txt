@@ -1,0 +1,129 @@
+-- Procédure 1: Augmenter_Salaire
+create or replace procedure Augmenter_Salaire(departement_id in number) as  
+begin
+    update Employe5 
+    set salaire = salaire * 0.1
+    where poste = 'Manager'
+    and ID_Employe in (
+        select ID_Employe
+        from Tâche5
+        where ID_Projet in (
+            select ID_Projet
+            from Projet5
+            where ID_Departement = departement_id
+        )
+    );
+    
+    update Employe5
+    set salaire = salaire * 0.05
+    where poste != 'Manager'
+    and ID_Employe in (
+        select ID_Employe
+        from Tâche5
+        where ID_Projet in (
+            select ID_Projet
+            from Projet5
+            where ID_Departement = departement_id
+        )
+    );
+end;
+/
+
+-- Procédure 2: Derniere_Tache
+create or replace procedure Derniere_Tache(id_employe in number) as
+begin
+    select t.Nom_Tache, p.Nom_Projet
+    into nom_tache, nom_projet
+    from Tâche5 t
+    join Projet5 p on t.ID_Projet = p.ID_Projet
+    where t.ID_Employe = id_employe
+    order by t.Date_Fin desc;
+    
+    dbms_output.put_line('Dernière tâche de l''employé : ' || nom_tache || ' dans le projet : ' || nom_projet);
+end;
+/
+
+-- Fonction 3: Nombre_Projets_Employe
+create or replace function Nombre_Projets_Employe(id_employe in number) return number is
+    nb_projets number;
+begin
+    select count(distinct p.ID_Projet)
+    into nb_projets
+    from Tâche5 t
+    join Projet5 p on t.ID_Projet = p.ID_Projet
+    where t.ID_Employe = id_employe;
+    
+    return nb_projets;
+exception
+    when no_data_found then
+        return 0;
+end;
+/
+
+-- Procédure 4: Liste_Taches_Projet
+create or replace procedure Liste_Taches_Projet(id_projet in number) as
+begin
+    for tache_row in (
+        select t.Nom_Tache, e.Nom, e.Prenom
+        from Tâche5 t
+        join Employe5 e on t.ID_Employe = e.ID_Employe
+        where t.ID_Projet = id_projet
+    ) loop
+        dbms_output.put_line('Tâche : ' || tache_row.Nom_Tache || ', Employé : ' || tache_row.Nom || ' ' || tache_row.Prenom);
+    end loop;
+end;
+/
+
+-- Procédure 5: Retards_Taches
+create or replace procedure Retards_Taches as
+begin
+    for retard_row in (
+        select e.Nom, e.Prenom, p.Nom_Projet, t.Nom_Tache
+        from Tâche5 t
+        join Employe5 e on t.ID_Employe = e.ID_Employe
+        join Projet5 p on t.ID_Projet = p.ID_Projet
+        where t.Date_Fin < sysdate - 5
+    ) loop
+        dbms_output.put_line('Employé en retard : ' || retard_row.Nom || ' ' || retard_row.Prenom || ', Projet : ' || retard_row.Nom_Projet || ', Tâche en retard : ' || retard_row.Nom_Tache);
+    end loop;
+end;
+/
+
+-- Procédure 6: Modifier_Date_Fin_Tache
+create or replace procedure Modifier_Date_Fin_Tache(id_tache in number, nouvelle_date_fin in date) as
+begin
+    update Tâche5
+    set Date_Fin = nouvelle_date_fin
+    where ID_Tache = id_tache;
+    
+    if sql%rowcount = 1 then
+        dbms_output.put_line('La date de fin de la tâche a été modifiée avec succès.');
+    else
+        raise_application_error(-20001, 'La tâche spécifiée n''existe pas.');
+    end if;
+
+end;
+/
+
+-- Procédure 7: Verifier_Projets_Terminees
+create or replace procedure Verifier_Projets_Terminees as
+begin
+    update Projet5
+    set Etat = 'Termine'
+    where Date_Fin < sysdate;
+    
+    dbms_output.put_line('Mise à jour des projets terminés effectuée avec succès.');
+end;
+/
+
+-- Programme principal
+begin
+    Augmenter_Salaire(1); -- Appel de la procédure Augmenter_Salaire pour le département 1
+    Derniere_Tache(1); -- Appel de la procédure Derniere_Tache pour l'employé avec l'ID 1
+    dbms_output.put_line('Nombre de projets pour l''employé 1 : ' || Nombre_Projets_Employe(1)); -- Appel de la fonction Nombre_Projets_Employe pour l'employé avec l'ID 1
+    Liste_Taches_Projet(1); -- Appel de la procédure Liste_Taches_Projet pour le projet avec l'ID 1
+    Retards_Taches; -- Appel de la procédure Retards_Taches
+    Modifier_Date_Fin_Tache(1, to_date('2024-05-10', 'YYYY-MM-DD')); -- Appel de la procédure Modifier_Date_Fin_Tache pour la tâche avec l'ID 1 et la nouvelle date de fin '2024-05-10'
+    Verifier_Projets_Terminees; -- Appel de la procédure Verifier_Projets_Terminees
+end;
+/
